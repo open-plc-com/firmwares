@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "gbl.h"
 #include "mx_misc.c"
@@ -28,11 +29,11 @@
 
 int main()
 {
-	uint32_t	i, j;
+	//uint32_t	i, j;
 
-unsigned int ui;
+//unsigned int ui;
 
-	char	s[128];		// For print
+//char	s[128];		// For print
 
 	SystemInit();
 	Read_Flash();
@@ -53,7 +54,7 @@ unsigned int ui;
 
 //while( 1 ) {}
 
-i = 0;
+//i = 0;
 
 	// ---------------------------------------------------------------------------
 	// The main program loop
