@@ -1,6 +1,6 @@
 /*
 	Name:			mx_cli.c
-	Purpose:		FirmWare for STM32F103C8T6, DS18B20, iButton, GPIO
+	Purpose:		FirmWare for STM32F103C8T6: DS18B20, iButton, GPIO
 	Author:			Alexander Suvorov (www.open-plc.com)
 	Created:		2016/07
 	Modified by:	2017/12
@@ -16,6 +16,7 @@ void Write_Flash( void )
 {
 	uint32_t	i;
 	uint16_t	j, k, l;
+//char s[128];
 
 	// FLASH_Unlock
 	FLASH->KEYR = FLASH_KEY1;
@@ -56,8 +57,11 @@ void Write_Flash( void )
 	while( FLASH->SR&FLASH_SR_BSY ) {}
 	*( __IO uint16_t* ) ( Page_63 + 14 ) = iButton_Timeout;
 
-	k = 16;
-	for( i = 0; i < Nn_Ch; i++ )
+	while( FLASH->SR&FLASH_SR_BSY ) {}
+	*( __IO uint16_t* ) ( Page_63 + 16 ) = Show_Data;
+
+	k = 18;
+	for( i = 0; i < MAX_NN_CH; i++ )
 	{
 		if( GPIO_X[i].gpio_x == GPIOA )
 		{
@@ -79,21 +83,21 @@ void Write_Flash( void )
 		while( FLASH->SR&FLASH_SR_BSY ) {}
 		*( __IO uint16_t* ) ( Page_63 + k ) = l; k += 2;
 
+//sprintf( s, " GPIO_X[%d].dev_type=%d\r\n", i, GPIO_X[i].dev_type ); put_str( s );
 		l = GPIO_X[i].dev_type;
 		while( FLASH->SR&FLASH_SR_BSY ) {}
 		*( __IO uint16_t* ) ( Page_63 + k ) = l; k += 2;
 
 	}	// for( i = 0; i < Ch_Nn; i++ )
 
-	//j = 0;
 	while( ( FLASH->SR&FLASH_SR_BSY ) ) {}
 	FLASH->CR &= ~FLASH_CR_PG;
 	FLASH->CR |= FLASH_CR_LOCK;
 
-	if( Nn_Ch )
-	{
-		free( GPIO_X );
-	}
+	//if( Nn_Ch )
+	//{
+		//free( GPIO_X );
+	//}
 }
 // ===========================================================================
 
@@ -102,100 +106,93 @@ void Write_Flash( void )
 void Read_Flash( void )
 // ===========================================================================
 {
-	uint32_t	i;
-	uint16_t	k, l;
-	//uint16_t	nn_ch_init;
-	static uint32_t *uid = ( uint32_t* ) 0x1FFFF7E8;
-
+	uint32_t			i;
+	uint16_t			k, l;
+	static uint32_t		*uid = ( uint32_t* ) 0x1FFFF7E8;
 
 //char s[128];
-//put_str( "\r\nread\r\n" );
 
 	DeviceType		= *( uint32_t* )   Page_63;
 	Sn				= *( uint32_t* ) ( Page_63 + 4 );
 	Noc				= *( uint16_t* ) ( Page_63 + 8 );
 	Speedc			= *( uint16_t* ) ( Page_63 + 10 );
 	Nn_Ch			= *( uint16_t* ) ( Page_63 + 12 );
-	iButton_Timeout = *( uint16_t* ) ( Page_63 + 14 );
-	//j				= 0;
+	iButton_Timeout	= *( uint16_t* ) ( Page_63 + 14 );
+	Show_Data		= *( uint16_t* ) ( Page_63 + 16 );
 
-	if( Nn_Ch > MAX_NN_CH )
+	//i = sizeof( GPIO_Data );
+	if( ( Nn_Ch > MAX_NN_CH ) || ( Nn_Ch == 0 ) )
 	{
-		Nn_Ch = 0;
+		Nn_Ch = 1;
 	}
-	else
+
+//sprintf( s, "\r\nNn_Ch=%d\r\n", Nn_Ch ); put_str( s );
+
+	k = 18;
+	for( i = 0; i < MAX_NN_CH; i++ )
 	{
-		i = sizeof( GPIO_Data );
-//put_str( "\r\n" );
-		if( Nn_Ch )
+		l = *( uint16_t* ) ( Page_63 + k ); k += 2;
+
+//sprintf( s, "l[%d]=%d", i, l ); put_str( s );
+
+		if( l == 1 )
 		{
-			GPIO_X = malloc( i * Nn_Ch );
-			k = 16;
-			for( i = 0; i < Nn_Ch; i++ )
-			{
-				l = *( uint16_t* ) ( Page_63 + k ); k += 2;
-//sprintf( s, "ch=%d port=%d ", ( i + 1), l ); put_str( s );
-				if( l == 1 )
-				{
-					GPIO_X[i].gpio_x = GPIOA;
-				}
-				else
-				if( l == 2 )
-				{
-					GPIO_X[i].gpio_x = GPIOB;
-				}
-				else
-				{
-					GPIO_X[i].gpio_x = 0;
-				}
+			GPIO_X[i].gpio_x = GPIOA;
+		}
+		else
+		if( l == 2 )
+		{
+			GPIO_X[i].gpio_x = GPIOB;
+		}
+		else
+		{
+			GPIO_X[i].gpio_x = 0;
+		}
 
-				l = *( uint16_t* ) ( Page_63 + k ); k += 2;
-//sprintf( s, "pin=%d ", l ); put_str( s );
-				if( l < 16 )
-				{
-					GPIO_X[i].gpio_pin_nn = l;
-				}
-				else
-				{
-					GPIO_X[i].gpio_x = 0;
-					GPIO_X[i].gpio_pin_nn = 0;
-				}
+		l = *( uint16_t* ) ( Page_63 + k ); k += 2;
+		if( l < 16 )	// Max port_x number
+		{
+			GPIO_X[i].gpio_pin_nn = l;
+		}
+		else
+		{
+			GPIO_X[i].gpio_x = 0;
+			GPIO_X[i].gpio_pin_nn = 0;
+		}
 
-				l = *( uint16_t* ) ( Page_63 + k ); k += 2;
-//sprintf( s, "dev=%d", l ); put_str( s );
-				if( l < 5 )
-				{
-					GPIO_X[i].dev_type = l;
-				}
-				else
-				{
-					GPIO_X[i].dev_type = 0;
-				}
+		l = *( uint16_t* ) ( Page_63 + k ); k += 2;
+		if( l <= MAX_DEV_TYPE )
+		{
+			GPIO_X[i].dev_type = l;
+		}
+		else
+		{
+			GPIO_X[i].dev_type = 0;
+		}
+
 //put_str( "\r\n" );
 
-				switch( GPIO_X[i].gpio_pin_nn )
-				{
-					case 0:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_0;	break;
-					case 1:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_1;	break;
-					case 2:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_2;	break;
-					case 3:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_3;	break;
-					case 4:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_4;	break;
-					case 5:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_5;	break;
-					case 6:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_6;	break;
-					case 7:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_7;	break;
-					case 8:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_8;	break;
-					case 9:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_9;	break;
-					case 10:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_10;	break;
-					case 11:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_11;	break;
-					case 12:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_12;	break;
-					case 13:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_13;	break;
-					case 14:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_14;	break;
-					case 15:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_15;	break;
-					default:	GPIO_X[i].gpio_pin_x	= 0;
-				}
-			}	// for( i = 0; i < Nn_Ch; i++ )
-		}	// if( Nn_Ch )
-	}	// else - if( Nn_Ch > MAX_NN_CH )
+		switch( GPIO_X[i].gpio_pin_nn )
+		{
+			case 0:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_0;	break;
+			case 1:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_1;	break;
+			case 2:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_2;	break;
+			case 3:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_3;	break;
+			case 4:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_4;	break;
+			case 5:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_5;	break;
+			case 6:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_6;	break;
+			case 7:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_7;	break;
+			case 8:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_8;	break;
+			case 9:		GPIO_X[i].gpio_pin_x	= GPIO_Pin_9;	break;
+			case 10:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_10;	break;
+			case 11:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_11;	break;
+			case 12:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_12;	break;
+			case 13:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_13;	break;
+			case 14:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_14;	break;
+			case 15:	GPIO_X[i].gpio_pin_x	= GPIO_Pin_15;	break;
+			default:	GPIO_X[i].gpio_pin_x	= 0;
+		}
+	}	// for( i = 0; i < MAX_NN_CH; i++ )
 
 	if( iButton_Timeout > 80 )
 	{
@@ -226,6 +223,7 @@ void Cli( void )
 	change_prm	= FALSE;
 	put_str( VER );
 	strcpy( cli_data, "\r\nConfig> " );		// Set prompt
+	clr_input();
 	put_str( cli_data );
 	m = sizeof( space_index ) / sizeof( int );
 
@@ -236,98 +234,12 @@ void Cli( void )
 			ret_button = FALSE;
 			cmd = FALSE;
 
+
 			n = strlen( usart_rx_data );
 			if( n )		// Length > 0
 			{
-				// Trim left spaces
-				j = 0;
-				while( usart_rx_data[0] == ' ' )
-				{
-					n = strlen( usart_rx_data );
-					for( j = 0; j < n; j++ )
-					{
-						usart_rx_data[j] = usart_rx_data[j + 1];
-					}
-				}
-
-				// -----------------------------------------------------------
-				// Trim right spaces
-				// -----------------------------------------------------------
-				n = strlen( usart_rx_data ) - 1;
-				if( n > 0 )
-				{
-					while( usart_rx_data[n] == ' ' )
-					{
-						if( n >= 0 )
-						{
-							usart_rx_data[n] = 0;
-							if( n )
-							{
-								n--;
-							}
-						}
-					}
-				}
-				// -----------------------------------------------------------
-
-				// -----------------------------------------------------------
-				// Prepare cmd string
-				// -----------------------------------------------------------
-				n = strlen( usart_rx_data );
-				for( i = 0; i < n; i++ )
-				{
-					if( ( usart_rx_data[i] < 32 ) || ( usart_rx_data[i] > 126 ) )
-					{
-						if( usart_rx_data[i] )
-						{
-							usart_rx_data[i] = '$';
-						}
-					}
-					if( usart_rx_data[i] > 96 )
-					{
-						usart_rx_data[i] -= 32;
-					}
-
-					while( ( usart_rx_data[i] == ' ' ) && ( usart_rx_data[i + 1] == ' ' ) )
-					{
-						for( j = i; j < n; j++ )
-						{
-							usart_rx_data[j] = usart_rx_data[j + 1];
-						}
-					}
-				}	// for( i = 0; i < n; i++ )
-
-				for( j = 0; j < m; j++ )
-				{
-					space_index[j] = 0;
-				}
-
-				j = 0;
-				for( i = 0; i < n; i++ )
-				{
-					if( ( usart_rx_data[i] == ' ' ) && ( j < m ) )
-					{
-						space_index[j++] = i;
-					}
-				}
-				// -----------------------------------------------------------
-
-				// -----------------------------------------------------------
-				// Get first param
-				// -----------------------------------------------------------
-				if( space_index[0] )
-				{
-					for( j = 0; j < space_index[0]; j++ )
-					{
-						s[j] = usart_rx_data[j];
-					}
-					s[j] = 0;
-				}
-				else
-				{
-					strcpy( s, usart_rx_data );
-				}
-				// -----------------------------------------------------------
+				s[0] = 0;
+				parce_cmd( ( char* ) &s, ( int* ) &space_index, m );
 
 
 				// -----------------------------------------------------------
@@ -358,18 +270,18 @@ void Cli( void )
 					put_str( "\r\n?       - This page" );
 					put_str( "\r\nq       - Exit from Config" );
 					put_str( "\r\nsh      - Show parameters" );
-//					put_str( "\r\n" );
-//					put_str( "\r\ncn <Nn> - set Nn on CAN bus (1..100)" );
-//					put_str( "\r\ncs <Nn> - set CAN speed" );
-//					put_str( "\r\n          Nn = 0; Speed 500000" );
-//					put_str( "\r\n          Nn = 1; Speed 250000" );
-//					put_str( "\r\n          Nn = 2; Speed 125000" );
-//					put_str( "\r\n          Nn = 3; Speed 100000" );
-//					put_str( "\r\n          Nn = 4; Speed 50000" );
-//					put_str( "\r\n          Nn = 5; Speed 20000" );
-//					put_str( "\r\n          Nn = 6; Speed 10000" );
 					put_str( "\r\n" );
-				 sprintf( s, "\r\nln <Nn>                                 - set number of channels (1-%d)", MAX_NN_CH ); put_str( s );
+//					put_str( "\r\ncn <Nn> - set Nn on CAN bus (1..100)" );	// Commit with standalone
+//					put_str( "\r\ncs <Nn> - set CAN speed" );               // Commit with standalone
+//					put_str( "\r\n          Nn = 0; Speed 500000" );        // Commit with standalone
+//					put_str( "\r\n          Nn = 1; Speed 250000" );        // Commit with standalone
+//					put_str( "\r\n          Nn = 2; Speed 125000" );        // Commit with standalone
+//					put_str( "\r\n          Nn = 3; Speed 100000" );        // Commit with standalone
+//					put_str( "\r\n          Nn = 4; Speed 50000" );         // Commit with standalone
+//					put_str( "\r\n          Nn = 5; Speed 20000" );         // Commit with standalone
+//					put_str( "\r\n          Nn = 6; Speed 10000" );         // Commit with standalone
+//					put_str( "\r\n" );                                      // Commit with standalone
+					sprintf( s, "\r\nln <Nn>                                 - set number of channels (1-%d)", MAX_NN_CH ); put_str( s );
 					put_str( "\r\nlc <channel> <port> <GPIOx> [GPIO Type] - set channel" );
 					put_str( "\r\nlt <channel> <GPIO Type>                - set channel type" );
 					put_str( "\r\n" );
@@ -382,14 +294,15 @@ void Cli( void )
 					put_str( "\r\n                   Nn = 2 - iButton" );
 					put_str( "\r\n                   Nn = 3 - bidirectional GPIO pulldown" );
 					put_str( "\r\n                   Nn = 4 - bidirectional GPIO pullup" );
+					put_str( "\r\n                   Nn = 5 - GPIO_Mode Input Floating" );
 					put_str( "\r\n" );
+					put_str( "\r\nsd   <Nn>  - Show Data, Nn=0/1" );
 					put_str( "\r\ntm   <Nn>  - Set timeout for iButton, Nn=0..10" );
-//					put_str( "\r\nwrsn <Nn>  - Write S/N" );
-//					put_str( "\r\nwrdt <Nn>  - Write Device Type" );
+//					put_str( "\r\nwrsn <Nn>  - Write S/N" );                // Commit with standalone
+//					put_str( "\r\nwrdt <Nn>  - Write Device Type" );        // Commit with standalone
 					put_str( "\r\n" );
 					cmd = TRUE;
 					clr_input();
-//change_prm = FALSE;
 				}
 				// -----------------------------------------------------------
 
@@ -399,6 +312,11 @@ void Cli( void )
 				// -----------------------------------------------------------
 				if( !cmd )
 				{
+					if( Show_Data )
+					{
+						Show_Data = 1;
+					}
+
 					if( strcmp( s, "SH" ) == 0 )
 					{
 						switch( Speedc )
@@ -419,9 +337,9 @@ void Cli( void )
 						sprintf( s, "S/N          %u\r\n", Sn );			put_str( s );
 //						sprintf( s, "Nn on CAN    %u\r\n", Noc );			put_str( s );
 //						sprintf( s, "CAN Speed    %d bps\r\n", n );			put_str( s );
-//						sprintf( s, "CAN Speed    %u\r\n", Speedc );		put_str( s );
 						put_str( "\r\n" );
 						sprintf( s, "BTN timeout  %d sec\r\n", ( iButton_Timeout / 8 ) );	put_str( s );
+						sprintf( s, "Show Data    %d\r\n", Show_Data );	put_str( s );
 						put_str( "\r\n" );
 						put_str( "ch port GPIO Type\r\n" );
 						put_str( "-- ---- ---------\r\n" );
@@ -458,6 +376,7 @@ void Cli( void )
 								case 2:		put_str( " (2) iButton" );						break;
 								case 3:		put_str( " (3) bidirectional GPIO pulldown" );	break;
 								case 4:		put_str( " (4) bidirectional GPIO pullup" );	break;
+								case 5:		put_str( " (5) GPIO_Mode Input Floating" );		break;
 								default:	put_str( " ----" );
 							}
 						put_str( "\r\n" );
@@ -468,7 +387,6 @@ void Cli( void )
 						}
 						cmd = TRUE;
 						clr_input();
-//change_prm = FALSE;
 					}	// if( strcmp( s, "SH" ) == 0 )
 				}
 				// -----------------------------------------------------------
@@ -482,45 +400,22 @@ void Cli( void )
 					if( strcmp( s, "CN" ) == 0 )
 					{
 						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );
+						if( s[0] )
 						{
-							if( space_index[1] )
+							i = atoi( s );
+							if( ( i > 0 ) && ( i < 101 ) )
 							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								Noc = i;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
 							}
 							else
 							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								put_str( "\r\nError CAN number. Enable 1..100\r\n" );
 							}
-
-							if( s[0] )
-							{
-								i = atoi( s );
-								if( ( i > 0 ) && ( i < 101 ) )
-								{
-									Noc = i;
-									Write_Flash();
-									Read_Flash();
-									change_prm = TRUE;
-								}
-								else
-								{
-									put_str( "\r\nError CAN number. Enable 1..100\r\n" );
-								}
-							}
-						}	// if( space_index[0] )
+						}	// if( s[0] )
 						else
 						{
 							put_str( "\r\nCommand error\r\n" );
@@ -539,50 +434,26 @@ void Cli( void )
 				{
 					if( strcmp( s, "CS" ) == 0 )
 					{
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
+							i = atoi( s );
+							if( ( i >= 0 ) && ( i < 7 ) )
 							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								Speedc = i;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
+
+//								reset_can();
+//								delay_us( 100 );
+//								Init_Can();
 							}
 							else
 							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								put_str( "\r\nError CAN speed\r\n" );
 							}
-
-							if( s[0] )
-							{
-								i = atoi( s );
-								if( ( i >= 0 ) && ( i < 7 ) )
-								{
-									Speedc = i;
-									Write_Flash();
-									Read_Flash();
-									change_prm = TRUE;
-
-//									reset_can();
-//									delay_us( 100 );
-//									Init_Can();
-								}
-								else
-								{
-									put_str( "\r\nError CAN speed\r\n" );
-								}
-							}
-						}	// if( space_index[0] )
+						}	// if( s[0] )
 						else
 						{
 							put_str( "\r\nCommand error\r\n" );
@@ -601,50 +472,29 @@ void Cli( void )
 				{
 					if( strcmp( s, "LN" ) == 0 )
 					{
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
-							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}
-
 							n = atoi( s );
 							if( ( n > 0 ) && ( n < ( MAX_NN_CH + 1 ) ) )
 							{
-								if( n == Nn_Ch )
-								{
-									put_str( "There is nothing to change.\r\n" );
-								}
-								else
-								{
+								//if( n == Nn_Ch )
+								//{
+									//put_str( "There is nothing to change.\r\n" );
+								//}
+								//else
+								//{
 									Nn_Ch = n;
 									Write_Flash();
 									Read_Flash();
 									change_prm = TRUE;
-								}
+								//}
 							}
 							else
 							{
-								put_str( "Wrong number, cancel.\r\n" );
+								put_str( "\r\nWrong number, cancel.\r\n" );
 							}
-						}	// if( space_index[0] )
+						}	// if( s[0] )
 						else
 						{
 							put_str( "\r\nCommand error\r\n" );
@@ -668,60 +518,15 @@ void Cli( void )
 						n3 = 0;
 						n4 = 0;
 
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
-							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[1] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[1] )
+							n1 = abs( atoi( s ) );
+						}
 
-							if( s[0] )
-							{
-								n1 = abs( atoi( s ) );
-							}
-						}	// if( space_index[0] )
-
-						// Get second param
-						s[0] = 0;
-						if( space_index[1] )
+						parce_prm( ( char*) &s, 2, ( int* ) &space_index, m );	// Get second param
+						if( s[0] )
 						{
-							if( space_index[2] )
-							{
-								i = 0;
-								for( j = ( space_index[1] + 1 ); j < space_index[2] + 1; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[2] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[1] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[2] )
-
 							if( s[1] == ' ' )
 							{
 								s[1] = 0;
@@ -751,68 +556,19 @@ void Cli( void )
 							{
 								n2 = 0xFF;
 							}
-						}	// if( space_index[1] )
+						}	// if( s[0] )
 
-						// Get third param
-						s[0] = 0;
-						if( space_index[2] )
+						parce_prm( ( char*) &s, 3, ( int* ) &space_index, m );	// Get third param
+						if( s[0] )
 						{
-							if( space_index[3] )
-							{
-								i = 0;
-								for( j = ( space_index[2] + 1 ); j < space_index[3] + 1; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[2] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[2] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[2] )
+							n3 = abs( atoi( s ) );
+						}
 
-							if( s[0] )
-							{
-								n3 = abs( atoi( s ) );
-							}
-						}	// if( space_index[2] )
-
-						// Get fourth param
-						s[0] = 0;
-						if( space_index[3] )
+						parce_prm( ( char*) &s, 4, ( int* ) &space_index, m );	// Get fourth param
+						if( s[0] )
 						{
-							if( space_index[4] )
-							{
-								i = 0;
-								for( j = ( space_index[3] + 1 ); j < space_index[4] + 1; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[2] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[3] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[4] )
-
-							if( s[0] )
-							{
-								n4 = abs( atoi( s ) );
-							}
-						}	// if( space_index[3] )
-//sprintf( s, "n1=%d n2=%d n3=%d n4=%d\r\n", n1, n2, n3, n4 ); put_str( s );
+							n4 = abs( atoi( s ) );
+						}
 
 						n = 1;
 						if( ( n1 == 0 ) ||  ( n1 > Nn_Ch ) )
@@ -865,7 +621,7 @@ void Cli( void )
 
 						if( n )
 						{
-							if( n4 > 4 )
+							if( n4 > MAX_DEV_TYPE )
 							{
 								put_str( "\r\nWrong GPIO Type\r\n" );
 								n = 0;
@@ -946,66 +702,17 @@ void Cli( void )
 						n1 = 0;
 						n2 = 0;
 
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
-							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[1] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[1] )
-
-							if( s[0] )
-							{
 								n1 = abs( atoi( s ) );
-							}
-						}	// if( space_index[0] )
+						}
 
-						// Get second param
-						s[0] = 0;
-						if( space_index[1] )
+						parce_prm( ( char*) &s, 2, ( int* ) &space_index, m );	// Get second param
+						if( s[0] )
 						{
-							if( space_index[2] )
-							{
-								i = 0;
-								for( j = ( space_index[1] + 1 ); j < space_index[2] + 1; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// if( space_index[2] )
-							else
-							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[1] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}	// else -- if( space_index[2] )
-
-							if( s[0] )
-							{
-								n2 = abs( atoi( s ) );
-							}
-						}	// if( space_index[1] )
-//sprintf( s, "\r\nn1=%d n2=%d\r\n", n1, n2 ); put_str( s );
+							n2 = abs( atoi( s ) );
+						}
 
 						n = 1;
 						if( ( n1 == 0 ) || ( n1 > Nn_Ch ) )
@@ -1016,7 +723,7 @@ void Cli( void )
 
 						if( n )
 						{
-							if( n2 > 4 )
+							if( n2 > MAX_DEV_TYPE )
 							{
 								put_str( "\r\nWrong GPIO Type\r\n" );
 								n = 0;
@@ -1025,6 +732,9 @@ void Cli( void )
 
 						if( n )
 						{
+
+//sprintf( s, "n2=%d\r\n", n2 ); put_str( s );
+
 							GPIO_X[n1-1].dev_type = n2;
 							Write_Flash();
 							Read_Flash();
@@ -1044,44 +754,20 @@ void Cli( void )
 				{
 					if( strcmp( s, "WRSN" ) == 0 )
 					{
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
+							i = atoi( s );
+							if( i > 0 )
 							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								Sn = i;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
 							}
 							else
 							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}
-
-							if( s[0] )
-							{
-								i = atoi( s );
-								if( i > 0 )
-								{
-									Sn = i;
-									Write_Flash();
-									Read_Flash();
-									change_prm = TRUE;
-								}
-								else
-								{
-									put_str( "\r\nError number\r\n" );
-								}
+								put_str( "\r\nError number\r\n" );
 							}
 						}	// if( space_index[0] )
 						else
@@ -1096,50 +782,26 @@ void Cli( void )
 
 
 				// -----------------------------------------------------------
-				// Input DT ( Device Type )
+				// Write DT ( Device Type )
 				// -----------------------------------------------------------
 				if( !cmd )
 				{
 					if( strcmp( s, "WRDT" ) == 0 )
 					{
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
+							i = atoi( s );
+							if( i > 0 )
 							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								DeviceType = i;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
 							}
 							else
 							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
-							}
-
-							if( s[0] )
-							{
-								i = atoi( s );
-								if( i > 0 )
-								{
-									DeviceType = i;
-									Write_Flash();
-									Read_Flash();
-									change_prm = TRUE;
-								}
-								else
-								{
-									put_str( "\r\nError number\r\n" );
-								}
+								put_str( "\r\nError number\r\n" );
 							}
 						}	// if( space_index[0] )
 						else
@@ -1160,46 +822,56 @@ void Cli( void )
 				{
 					if( strcmp( s, "TM" ) == 0 )
 					{
-						// Get first param
-						s[0] = 0;
-						if( space_index[0] )
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
 						{
-							if( space_index[1] )
+							i = atoi( s );
+							if( ( i >= 0 ) && ( i < 11 ) )
 							{
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < space_index[1]; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								iButton_Timeout = i * 8;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
 							}
 							else
 							{
-								n = strlen( usart_rx_data );
-								i = 0;
-								for( j = ( space_index[0] + 1 ); j < n; j++ )
-								{
-									s[i++] = usart_rx_data[j];
-								}
-								s[i] = 0;
+								put_str( "\r\nError TM number\r\n" );
 							}
+						}	// if( s[0] )
+						else
+						{
+							put_str( "\r\nCommand error\r\n" );
+						}
+						cmd = TRUE;
+						clr_input();
+					}	// if( strcmp( s, "TM" ) == 0 )
+				}
+				// -----------------------------------------------------------
 
-							if( s[0] )
+
+				// -----------------------------------------------------------
+				// Input SD ( Show Data )
+				// -----------------------------------------------------------
+				if( !cmd )
+				{
+					if( strcmp( s, "SD" ) == 0 )
+					{
+						parce_prm( ( char*) &s, 1, ( int* ) &space_index, m );	// Get first param
+						if( s[0] )
+						{
+							i = atoi( s );
+							if( ( i == 0 ) || ( i == 1 ) )
 							{
-								i = atoi( s );
-								if( ( i >= 0 ) && ( i < 11 ) )
-								{
-									iButton_Timeout = i * 8;
-									Write_Flash();
-									Read_Flash();
-									change_prm = TRUE;
-								}
-								else
-								{
-									put_str( "\r\nError TM number\r\n" );
-								}
+								Show_Data = i;
+								Write_Flash();
+								Read_Flash();
+								change_prm = TRUE;
 							}
-						}	// if( space_index[0] )
+							else
+							{
+								put_str( "\r\nError SD value\r\n" );
+							}
+						}	// if( s[0] )
 						else
 						{
 							put_str( "\r\nCommand error\r\n" );
@@ -1243,78 +915,79 @@ void Cli_State( void )
 	{
 		m = 1;
 		l = strlen( usart_rx_data );
-		for( i = 0; i < l; i++ )
+		if( l )
 		{
-			if( ( usart_rx_data[i] < '0' ) || ( usart_rx_data[i] > '9' ) )
+			for( i = 0; i < l; i++ )
 			{
-				m = 0;
-			}
-			if( islower( ( int ) usart_rx_data[i] ) )
-			{
-				usart_rx_data[i] = toupper( usart_rx_data[i] );
-			}
-		}	// for( i = 0; i < l; i++ )
-		//ret_button = FALSE;
-
-		if( strcmp( usart_rx_data, "CFG" ) == 0 )	// Goto to Config mode
-		{
-			Cli();	// CLI mode
-		}
-		else
-		if( m )
-		{
-//put_str( "digit!\r\n" );
-			n = atoi( usart_rx_data );
-			if( ( n ) && ( n <= MAX_NN_CH ) )
-			{
-				n--;
-//put_str( "digit-2!\r\n" );
-				if( GPIO_X[n].gpio_x )
+				if( ( usart_rx_data[i] < '0' ) || ( usart_rx_data[i] > '9' ) )
 				{
-					if( ( GPIO_X[n].dev_type == 3 ) || ( GPIO_X[n].dev_type == 4 ) )
+					m = 0;
+				}
+				if( islower( ( int ) usart_rx_data[i] ) )
+				{
+					usart_rx_data[i] = toupper( usart_rx_data[i] );
+				}
+			}	// for( i = 0; i < l; i++ )
+
+			if( strcmp( usart_rx_data, "CFG" ) == 0 )	// Goto to Config mode
+			{
+				Cli();	// CLI mode
+			}
+			else
+			if( m )
+			{
+				n = atoi( usart_rx_data );
+				if( ( n ) && ( n <= MAX_NN_CH ) )
+				{
+					n--;
+					if( GPIO_X[n].gpio_x )
 					{
-						l = GPIO_ReadInputDataBit( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
-						if( l )
+						if( ( GPIO_X[n].dev_type == 3 ) || ( GPIO_X[n].dev_type == 4 ) )
 						{
-							GPIO_ResetBits( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
-						}
+							l = GPIO_ReadInputDataBit( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
+							if( l )
+							{
+								GPIO_ResetBits( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
+							}
+							else
+							{
+								GPIO_SetBits( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
+							}
+						}	// if( ( GPIO_X[n].dev_type == 3 ) || ( GPIO_X[n].dev_type == 4 ) )
 						else
 						{
-							GPIO_SetBits( GPIO_X[n].gpio_x, GPIO_X[n].gpio_pin_x );
+							put_str( "\r\nChannel may be GPIO only.\r\n" );
 						}
-					}	// if( ( GPIO_X[n].dev_type == 3 ) || ( GPIO_X[n].dev_type == 4 ) )
+					}
 					else
 					{
-						put_str( "\r\nChannel may be GPIO only.\r\n" );
-					}
-//put_str( "\r\n" );
-				}
+						put_str( "\r\nChannel not defined.\r\n" );
+					}					
+				}	// if( ( n ) && ( n <= MAX_NN_CH ) )
 				else
 				{
-					put_str( "\r\nChannel not defined.\r\n" );
-				}					
-//clr_input();
-			}	// if( ( n ) && ( n <= MAX_NN_CH ) )
+					put_str( "\r\nWrong Nn of channel.\r\n" );
+				}
+			}	// if( m )
 			else
 			{
-				put_str( "\r\nWrong Nn of channel.\r\n" );
-//clr_input();
-			}
-		}	// if( n )
+				if( strlen( usart_rx_data ) )
+				{
+					put_str( "\r\nUnknown command\r\n" );
+					put_str( "print\r\n" );
+					put_str( "       <cfg> for Config\r\n" );
+					put_str( "       <nn>\r\n" );
+					put_str( "             nn = Nn of channel GPIO for reverse state\r\n" );
+				}
+				put_str( cli_data );	// Identifier
+			}	// else - if( m )
+			clr_input();
+		}
 		else
 		{
-			if( strlen( usart_rx_data ) )
-			{
-				put_str( "\r\nUnknown command\r\n" );
-				put_str( "print\r\n" );
-				put_str( "       <cfg> for Config\r\n" );
-				put_str( "       <nn>\r\n" );
-				put_str( "             nn = Nn of channel GPIO for reverse state\r\n" );
-//clr_input();				
-			}
 			put_str( cli_data );	// Identifier
-		}	// else - if( n )
-	clr_input();
+			clr_input();
+		}
 	}	// if( ret_button ) -- Return button is pressed
 }
 // ===========================================================================

@@ -139,7 +139,9 @@ void w1_read_data( uint16_t nn )
 		{
 			data_64 <<= 8;
 			data_64 |= m[i];
+//sprintf( s, " %0x", m[i] ); put_str( s );
 		}
+//put_str( "\r\n" );
 		if( data_64 == 0xFFFFFFFFFFFFFFFF )
 		{
 			if( GPIO_X[nn].ibutton_time )
@@ -175,7 +177,7 @@ void Read_Data( void )
 	{
 		for( i = 0; i < Nn_Ch; i++ )
 		{
-			if( GPIO_X[i].dev_type == 1 )
+			if( ( GPIO_X[i].dev_type == 1 ) && GPIO_X[i].gpio_x )
 			{
 				// Reset sensor
 				GPIO_ResetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
@@ -195,7 +197,7 @@ void Read_Data( void )
 	else
 	if( Step_DS == 1 )
 	{
-		if( abs( CntTime - lc1 ) >= 100 )
+		if( ( CntTime - lc1 ) >= 100 )
 		{
 			Step_DS = 2;
 			lc1 = CntTime;
@@ -206,7 +208,7 @@ void Read_Data( void )
 	{
 		for( i = 0; i < Nn_Ch; i++ )
 		{
-			if( GPIO_X[i].dev_type == 1 )
+			if( ( GPIO_X[i].dev_type == 1 ) && GPIO_X[i].gpio_x )
 			{
 				// Reset sensor
 				GPIO_ResetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
@@ -228,7 +230,7 @@ void Read_Data( void )
 	else
 	if( Step_DS == 3 )
 	{
-		if( abs( CntTime - lc1 ) >= 300 )
+		if( ( CntTime - lc1 ) >= 300 )
 		{
 			Step_DS = 0;
 			lc1 = CntTime;
@@ -242,8 +244,9 @@ void Read_Data( void )
 	{
 		for( i = 0; i < Nn_Ch; i++ )
 		{
-			if( GPIO_X[i].dev_type == 2 )
+			if( ( GPIO_X[i].dev_type == 2 ) && GPIO_X[i].gpio_x )
 			{
+//put_str( "01\r\n" );
 				GPIO_ResetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
 			}
 		}
@@ -253,12 +256,13 @@ void Read_Data( void )
 	else
 	if( Step_BTN == 1 )
 	{
-		if( CntTime - lc2 >= 25 )
+		if( ( CntTime - lc2 ) >= 25 )
 		{
 			for( i = 0; i < Nn_Ch; i++ )
 			{
-				if( GPIO_X[i].dev_type == 2 )
+				if( ( GPIO_X[i].dev_type == 2 ) && GPIO_X[i].gpio_x )
 				{
+//put_str( "02\r\n" );
 					GPIO_SetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
 				}
 			}
@@ -267,8 +271,9 @@ void Read_Data( void )
 
 			for( i = 0; i < Nn_Ch; i++ )
 			{
-				if( GPIO_X[i].dev_type == 2 )
+			 	if( ( GPIO_X[i].dev_type == 2 ) && GPIO_X[i].gpio_x )
 				{
+//put_str( "03\r\n" );
 					// Get data
 					w1_write_byte( i, 0x33 );
 					delay_us( 30 );
@@ -284,14 +289,17 @@ void Read_Data( void )
 	// ---------------------------------------------------------------------------
 	for( i = 0; i < Nn_Ch; i++ )
 	{
-		if( ( GPIO_X[i].dev_type == 3 ) || ( GPIO_X[i].dev_type == 4 ) )
+		if( GPIO_X[i].gpio_x )
 		{
-			GPIO_X[i].raw_data = GPIO_ReadInputDataBit( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
+			if( ( GPIO_X[i].dev_type == 3 ) || \
+				( GPIO_X[i].dev_type == 4 ) || \
+				( GPIO_X[i].dev_type == 5 ) )
+			{
+				GPIO_X[i].raw_data = GPIO_ReadInputDataBit( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );
 //sprintf( s, " gpio[%d]=%d\r\n", i, ( int ) GPIO_X[i].raw_data ); put_str( s );
+			}
 		}
 	}
-
-
 }
 // ===========================================================================
 
@@ -300,15 +308,30 @@ void Read_Data( void )
 void Print_Data( void )
 // ===========================================================================
 {
-	#ifdef SHOW_DATA
+	//#ifdef SHOW_DATA
 	int			i, j;
 	float		f;
 	uint8_t		*b;
 	char		port_ch;
 	char		s[128];
 
-	if( ( ( CntTime - lc3 ) > ( SHOW_DATA_INTERVAL ) ) && !usart_rx_data[0] )
+	j = 1;
+	for( i = 0; i < Nn_Ch; i++ )
 	{
+		if( ( GPIO_X[i].dev_type != 0 ) && ( GPIO_X[i].gpio_x != 0 ) )
+		{
+			j = 0;
+		}
+	}
+	if( j )
+	{
+		return;
+	}
+
+	//if( Show_Data )
+	//{
+		if( ( ( CntTime - lc3 ) > ( SHOW_DATA_INTERVAL ) ) && !usart_rx_data[0] )
+		{
 //put_str( "--->>>\r\n" );
 //		//k = Dev_Type;
 //		put_str( "CFG  = " );
@@ -320,47 +343,50 @@ void Print_Data( void )
 //		}
 //		put_str( "\r\n" );
 
-		for( i = 0; i < Nn_Ch; i++ )
-		{
-			if( ( GPIO_X[i].dev_type != 0 ) && ( GPIO_X[i].gpio_x != 0 ) )
+			for( i = 0; i < Nn_Ch; i++ )
 			{
-				if( GPIO_X[i].gpio_x == GPIOA )
+				if( ( GPIO_X[i].dev_type != 0 ) && ( GPIO_X[i].gpio_x != 0 ) )
 				{
-					port_ch = 'A';
-				}
-				else
-				if( GPIO_X[i].gpio_x == GPIOB )
-				{
-					port_ch = 'B';
-				}
-				else
-				{
-					port_ch = '-';
-				}
+					if( GPIO_X[i].gpio_x == GPIOA )
+					{
+						port_ch = 'A';
+					}
+					else
+					if( GPIO_X[i].gpio_x == GPIOB )
+					{
+						port_ch = 'B';
+					}
+					else
+					{
+						port_ch = '-';
+					}
 
-				b = ( uint8_t* ) &GPIO_X[i].raw_data;
-				sprintf( s, "ch%-2d (%c%-2d) =", ( i + 1 ), port_ch, GPIO_X[i].gpio_pin_nn ); put_str( s );
-				for( j = 0; j < 8; j++ )
-				{
-					sprintf( s, " %02X", b[j] ); put_str( s );
+					b = ( uint8_t* ) &GPIO_X[i].raw_data;
+					sprintf( s, "ch%-2d (%c%-2d) =", ( i + 1 ), port_ch, GPIO_X[i].gpio_pin_nn ); put_str( s );
+					for( j = 0; j < 8; j++ )
+					{
+						sprintf( s, " %02X", b[j] ); put_str( s );
+					}
+					if( GPIO_X[i].dev_type == 1 )	// DS18B20
+					{
+						f = GPIO_X[i].raw_data / 10.0;
+						//sprintf( s, " / %03.1f (err=%d)", f, GPIO_X[i].err ); put_str( s );
+						sprintf( s, " / %03.1f", f ); put_str( s );
+					}
+					else	// GPIO
+					if( ( GPIO_X[i].dev_type == 3 ) || \
+						( GPIO_X[i].dev_type == 4 ) || \
+						( GPIO_X[i].dev_type == 5 ) )	// GPIO
+					{
+						sprintf( s, " / %d", ( uint16_t ) GPIO_X[i].raw_data ); put_str( s );
+					}
+					put_str( "\r\n" );
 				}
-				if( GPIO_X[i].dev_type == 1 )	// DS18B20
-				{
-					f = GPIO_X[i].raw_data / 10.0;
-					//sprintf( s, " / %03.1f (err=%d)", f, GPIO_X[i].err ); put_str( s );
-					sprintf( s, " / %03.1f", f ); put_str( s );
-				}
-				else
-				if( ( GPIO_X[i].dev_type == 3 ) || ( GPIO_X[i].dev_type == 4 ) )	// GPIO
-				{
-					sprintf( s, " / %d", ( uint16_t ) GPIO_X[i].raw_data ); put_str( s );
-				}
-				put_str( "\r\n" );
 			}
-		}
-		put_str( "\r\n" );
-		lc3 = CntTime;
+			put_str( "\r\n" );
+			lc3 = CntTime;
+		//}
 	}
-	#endif
+	//#endif
 }
 // ===========================================================================

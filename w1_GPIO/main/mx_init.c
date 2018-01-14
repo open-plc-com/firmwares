@@ -1,19 +1,26 @@
+/*
+	Name:			mx_init.c
+	Purpose:		FirmWare for STM32F103C8T6: DS18B20, iButton, GPIO
+	Author:			Alexander Suvorov (www.open-plc.com)
+	Created:		2016/07
+	Modified by:	2017/12
+	RCS-ID:
+	Copyright:		(c) Alexander Suvorov
+	Licence:		The MIT License (MIT)
+*/
+
+
 #include "mx_init.h"
 
 void MX_Init( void )
 {
-	int				i;
+	int				i, j;
 	unsigned int	ui;
 //	char	s[128];
 
 	GPIO_InitTypeDef			GPIO_InitStructure;
 	USART_InitTypeDef			USART_InitStructure;
 	NVIC_InitTypeDef			NVIC_InitStructure;
-//	ADC_InitTypeDef				ADC_InitStructure;
-//	DMA_InitTypeDef				DMA_InitStructure;
-//	TIM_TimeBaseInitTypeDef		TIMER_InitStructure;
-//	DAC_InitTypeDef				DAC_InitStructure;
-
 
 	// -----------------------------------------------------------------------
 	// Oscilator
@@ -66,14 +73,15 @@ void MX_Init( void )
 	while( RCC_GetSYSCLKSource() != 0x08 ) {}						// Wait till PLL is used as system clock source
 
 
+	// -----------------------------------------------------------------------
 	// Enable peripheral clock
+	// -----------------------------------------------------------------------
 	RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOA, ENABLE );			// Clocking GPIOA
 	RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOB, ENABLE );			// Clocking GPIOB
 	RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOC, ENABLE );			// Clocking GPIOC
 	RCC_APB2PeriphClockCmd( RCC_APB2Periph_USART1, ENABLE );		// Clocking USART1
-	//RCC_APB2PeriphClockCmd( RCC_APB2Periph_ADC1, ENABLE );		// Clocking ADC1
-	//RCC_AHBPeriphClockCmd( RCC_AHBPeriph_DMA1, ENABLE );			// Clocking DMA1 clock
-	//RCC_APB1PeriphClockCmd( RCC_APB1Periph_TIM4, ENABLE );			// Clocking TIM4
+	RCC_APB2PeriphClockCmd( RCC_APB2Periph_AFIO, ENABLE );			// Clocking AF APB2
+
 
 	// -----------------------------------------------------------------------
 	// Start DWT
@@ -97,11 +105,11 @@ void MX_Init( void )
 	GPIO_SetBits( GPIOC, GPIO_Pin_13 );								// Clear bit "blinking"
 	#endif
 
-	// Configure GPIO pin : PB2 - BOOT1
-	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_2;
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN_FLOATING;
-	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_2MHz;
-	GPIO_Init( GPIOB, &GPIO_InitStructure );
+//	// Configure GPIO pin : PB2 - BOOT1
+//	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_2;
+//	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN_FLOATING;
+//	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_2MHz;
+//	GPIO_Init( GPIOB, &GPIO_InitStructure );
 
 	// -----------------------------------------------------------------------
 	// Init PA & PB
@@ -109,31 +117,94 @@ void MX_Init( void )
 
 	// Init PA
 	ui = 0;
+	j = 0;
 	for( i = 0; i < Nn_Ch; i++ )
 	{
 		if( GPIO_X[i].gpio_x == GPIOA )
 		{
-			ui |= GPIO_X[i].gpio_pin_x;
+			if( ( GPIO_X[i].dev_type == 1 ) || \
+				( GPIO_X[i].dev_type == 2 ) || \
+				( GPIO_X[i].dev_type == 3 ) || \
+				( GPIO_X[i].dev_type == 4 ) )
+			{
+				ui |= GPIO_X[i].gpio_pin_x;
+				j = 1;
+			}
 		}
 	}
-	GPIO_InitStructure.GPIO_Pin		= ui;
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
-	GPIO_Init( GPIOA, &GPIO_InitStructure );
+	if( j )
+	{
+		GPIO_InitStructure.GPIO_Pin		= ui;
+		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_Out_PP;
+		//GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF_PP;
+		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
+		GPIO_Init( GPIOA, &GPIO_InitStructure );
+	}
+	ui = 0;
+	j = 0;
+	for( i = 0; i < Nn_Ch; i++ )
+	{
+		if( GPIO_X[i].gpio_x == GPIOA )
+		{
+			if( GPIO_X[i].dev_type == 5 )
+			{
+				ui |= GPIO_X[i].gpio_pin_x;
+				j = 1;
+			}
+		}
+	}
+	if( j )
+	{
+		GPIO_InitStructure.GPIO_Pin		= ui;
+		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN_FLOATING;
+		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
+		GPIO_Init( GPIOA, &GPIO_InitStructure );
+	}
 
 	// Init PB
 	ui = 0;
+	j = 0;
 	for( i = 0; i < Nn_Ch; i++ )
 	{
 		if( GPIO_X[i].gpio_x == GPIOB )
 		{
-			ui |= GPIO_X[i].gpio_pin_x;
+			if( ( GPIO_X[i].dev_type == 1 ) || \
+				( GPIO_X[i].dev_type == 2 ) || \
+				( GPIO_X[i].dev_type == 3 ) || \
+				( GPIO_X[i].dev_type == 4 ) )
+			{
+				ui |= GPIO_X[i].gpio_pin_x;
+				j = 1;
+			}
 		}
 	}
-	GPIO_InitStructure.GPIO_Pin		= ui;
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
-	GPIO_Init( GPIOB, &GPIO_InitStructure );
+	if( j )
+	{
+		GPIO_InitStructure.GPIO_Pin		= ui;
+		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_Out_PP;
+		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
+		GPIO_Init( GPIOB, &GPIO_InitStructure );
+	}
+	ui = 0;
+	j = 0;
+	for( i = 0; i < Nn_Ch; i++ )
+	{
+		if( GPIO_X[i].gpio_x == GPIOB )
+		{
+			if( GPIO_X[i].dev_type == 5 )
+			{
+				ui |= GPIO_X[i].gpio_pin_x;
+				j = 1;
+			}
+		}
+	}
+	if( j )
+	{
+		GPIO_InitStructure.GPIO_Pin		= ui;
+		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN_FLOATING;
+		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
+		GPIO_Init( GPIOB, &GPIO_InitStructure );
+	}
 
 	// Set or reset pins PA & PB
 	for( i = 0; i < Nn_Ch; i++ )
@@ -147,6 +218,7 @@ void MX_Init( void )
 					GPIO_ResetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );	// Reset bit
 				}
 				else
+				if( ( GPIO_X[i].dev_type == 1 ) || ( GPIO_X[i].dev_type == 2 ) || ( GPIO_X[i].dev_type == 4 ) )
 				{
 					GPIO_SetBits( GPIO_X[i].gpio_x, GPIO_X[i].gpio_pin_x );		// Set bit
 				}
@@ -156,12 +228,13 @@ void MX_Init( void )
 
 
 //	// -----------------------------------------------------------------------
-//	// PA0 - MCP2515 interrupt
+//	// PB3 - MCP2515 interrupt
 //	// -----------------------------------------------------------------------
-//	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_0;
+	GPIO_PinRemapConfig( GPIO_Remap_SWJ_Disable, ENABLE );
+//	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_3;
 //	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN_FLOATING;
 //	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_2MHz;
-//	GPIO_Init( GPIOA, &GPIO_InitStructure );
+//	GPIO_Init( GPIOB, &GPIO_InitStructure );
 
 
 	// -----------------------------------------------------------------------
@@ -203,7 +276,6 @@ void MX_Init( void )
 	NVIC_EnableIRQ( USART1_IRQn );									// Enable interrupt UART1
 	USART_ITConfig( USART1, USART_IT_RXNE, ENABLE );				// Enable interrupt for Rx
 	//USART_ITConfig( USART1, USART_IT_TC, ENABLE );				// Enable interrupt for Tx
-	//usart_rx_data[0] = 0;											// Clear Rx buffer
 
 
 	// -----------------------------------------------------------------------
@@ -212,68 +284,6 @@ void MX_Init( void )
 	//SysTick_Config( F_APB1 / 5000 );								// interrupt 200 us
 	SysTick_Config( F_APB1 / 100 );								// interrupt 10 ms
 	// -----------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//	TIM_TimeBaseStructInit( &TIMER_InitStructure );
-//	TIMER_InitStructure.TIM_CounterMode		= TIM_CounterMode_Up;
-//	//TIMER_InitStructure.TIM_Prescaler		= 8000;
-//	#if F_APB1 == 48000000
-//		TIMER_InitStructure.TIM_Prescaler	= 2400;		// 4900 Hz for 48 MHz
-//	#else
-//		TIMER_InitStructure.TIM_Prescaler	= 1200;		// 4900 Hz for 24 MHz
-//	#endif
-//	TIMER_InitStructure.TIM_Period			= 1;		// One counter
-//	TIM_TimeBaseInit( TIM4, &TIMER_InitStructure );
-//	TIM_ITConfig( TIM4, TIM_IT_Update, ENABLE );
-//	TIM_Cmd( TIM4, ENABLE );
-//
-//	/* NVIC Configuration */
-//	/* Enable the TIM4_IRQn Interrupt */
-//	NVIC_InitStructure.NVIC_IRQChannel						= TIM4_IRQn;
-//	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 0;
-//	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 0;
-//	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
-//	NVIC_Init( &NVIC_InitStructure );
 
 
 //	// -----------------------------------------------------------------------
@@ -291,14 +301,11 @@ void MX_Init( void )
 	// -----------------------------------------------------------------------
 	CntTime			= 0;		// SysTick count
 	ret_button		= FALSE;	// Press "Enter"?
-	//Nn_Ch			= 0;
 	cli_mode		= FALSE;	// CLI mode
 	NoAnswer		= FALSE;	// No answer in broadcast
 
 	Step_DS			= 0;
 	Step_BTN		= 0;
-
-	//transmit_mode	= FALSE;
-	//min_lvl			= 0;
-	//max_lvl			= 0;
+	lc3				= CntTime;
+	lc2				= CntTime;
 }

@@ -1,22 +1,16 @@
 /*
 	Name:			mx_misc.c
-	Purpose:
-	Author:			Alexander Suvorov
+	Purpose:		FirmWare for STM32F103C8T6: DS18B20, iButton, GPIO
+	Author:			Alexander Suvorov (www.open-plc.com)
 	Created:		2016/07
-	Modified by:
+	Modified by:	2017/12
 	RCS-ID:
 	Copyright:		(c) Alexander Suvorov
 	Licence:		The MIT License (MIT)
-	Site:			open-plc.com
 */
 
 
 #include "mx_misc.h"
-
-//void reset_can( void );
-//void Init_Can( void );
-//void put_str( char *s );
-
 
 // ===========================================================================
 // Delay in milliseconds
@@ -142,17 +136,6 @@ void SysTick_Handler( void )
 
 	CntTime++;
 
-	//ADC_DMACmd( ADC1, DISABLE );
-	//SysTick_Config( 0 );								// interrupt 200 us
-	//SUM = 0;
-	//for( i = 0; i < 1000; i++ )
-	//{
-	//SUM += ADC_VALUES[i];
-	//}
-	//SUM /= 1000;
-	//ADC_DMACmd( ADC1, ENABLE );
-	//SysTick_Config( F_APB1 / 5000 );								// interrupt 200 us
-
 //	CANDownTime++;
 
 //	if( CANDownTime > 500 )
@@ -171,26 +154,3 @@ void SysTick_Handler( void )
 //	}
 }
 // ===========================================================================
-
-
-//// ===========================================================================
-//void TIM4_IRQHandler( void )
-//{
-//	int i;
-//
-//	TIM_Cmd( TIM4, DISABLE );
-//	SUM = 0;
-//	for( i = 0; i < ADC_ARRAY_SIZE; i++ )
-//	{
-//		SUM += ADC_VALUES[i];
-//	}
-//	SUM /= ADC_ARRAY_SIZE;
-//
-//	if( TIM_GetITStatus( TIM4, TIM_IT_Update ) != RESET )
-//	{
-//		TIM_ClearITPendingBit( TIM4, TIM_IT_Update );
-//		GPIOA->ODR ^= GPIO_Pin_8;
-//	}
-//	TIM_Cmd( TIM4, ENABLE );
-//}
-//// ===========================================================================
