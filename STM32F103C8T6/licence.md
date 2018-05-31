@@ -1,1 +1,1 @@
-All projects in this repositary is a MIT license.
+All projects in this repository is a MIT license.
